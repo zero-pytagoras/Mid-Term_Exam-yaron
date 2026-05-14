@@ -1,81 +1,96 @@
-#!/bin/sh
+#!/bin/bash
 set -eu
 
-REPO_ROOT=$(cd "$(dirname "$0")" && pwd)
-DOCKER_IMAGE="status-dashboard:latest"
-CONTAINER_NAME="status-dashboard"
-NGINX_CONF_SRC="$REPO_ROOT/nginx/status-dashboard"
-NGINX_CONF_DST="/etc/nginx/sites-available/status-dashboard"
-ENV_FILE="$REPO_ROOT/.env"
+function main() {
+  require_root
+  check_commands
+  load_env
+  check_env_vars
+  build_image
+  stop_remove_container
+  run_container
+  configure_nginx
+  print_success
+}
 
-die() {
+function die() {
   echo "Error: $*" >&2
   exit 1
 }
 
-require_root() {
-  if [ "$(id -u)" -ne 0 ]; then
+function require_root() {
+  if [[ "$(id -u)" -ne 0 ]]; then
     die "This script must be run as root. Use sudo ./install.sh"
   fi
 }
 
-check_commands() {
+function check_commands() {
   command -v docker >/dev/null 2>&1 || die "docker is not installed"
   command -v nginx >/dev/null 2>&1 || die "nginx is not installed"
 }
 
-load_env() {
-  if [ ! -f "$ENV_FILE" ]; then
-    die ".env file not found in $REPO_ROOT"
+function load_env() {
+  REPO_ROOT=$(cd "$(dirname "$0")" && pwd)
+  ENV_FILE="$REPO_ROOT/.env"
+  # Only load from .env if not set in environment
+  # (API_KEY, PORT, VERSION)
+  if [[ -f "$ENV_FILE" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      case "$line" in
+        ''|\#*) continue ;;
+        *=*)
+          var=$(printf '%s' "$line" | cut -d= -f1)
+          val=$(printf '%s' "$line" | cut -d= -f2-)
+          # Only set if not already set in environment
+          if [[ -z "${!var:-}" ]]; then
+            export "$var=$val"
+          fi
+          ;;
+      esac
+    done < "$ENV_FILE"
   fi
-  while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in
-      ''|\#*) continue ;;
-      *=*)
-        var=$(printf '%s' "$line" | cut -d= -f1)
-        val=$(printf '%s' "$line" | cut -d= -f2-)
-        eval "[ -z \"\${$var+x}\" ] && $var=\$val"
-        ;;
-    esac
-  done < "$ENV_FILE"
+  # Set defaults for PORT and VERSION if still not set
+  export PORT="${PORT:-5000}"
+  export VERSION="${VERSION:-1.0.0}"
 }
 
-check_env_vars() {
-  if [ -z "${API_KEY:-}" ]; then
-    die "API_KEY must be set in .env"
+function check_env_vars() {
+  if [[ -z "${API_KEY:-}" ]]; then
+    die "API_KEY must be set as an environment variable or in .env"
   fi
-  PORT="${PORT:-5000}"
-  VERSION="${VERSION:-1.0.0}"
 }
 
-build_image() {
+function build_image() {
   echo "Building Docker image..."
-  docker build -t "$DOCKER_IMAGE" "$REPO_ROOT"
+  docker build -t "status-dashboard:latest" "$(cd "$(dirname "$0")" && pwd)"
 }
 
-stop_remove_container() {
-  if docker ps -a --format '{{.Names}}' | grep -q "^$CONTAINER_NAME\$"; then
+function stop_remove_container() {
+  if docker ps -a --format '{{.Names}}' | grep -q "^status-dashboard\$"; then
     echo "Stopping and removing existing container..."
-    docker stop "$CONTAINER_NAME" || true
-    docker rm "$CONTAINER_NAME" || true
+    docker stop "status-dashboard" || true
+    docker rm "status-dashboard" || true
   fi
 }
 
-run_container() {
+function run_container() {
   echo "Running new container..."
   docker run -d \
-    --name "$CONTAINER_NAME" \
+    --name "status-dashboard" \
     --restart unless-stopped \
     -e PORT="$PORT" \
     -e VERSION="$VERSION" \
     -e API_KEY="$API_KEY" \
     -p 127.0.0.1:5000:5000 \
-    "$DOCKER_IMAGE"
+    "status-dashboard:latest"
 }
 
-configure_nginx() {
+function configure_nginx() {
+  REPO_ROOT=$(cd "$(dirname "$0")" && pwd)
+  NGINX_CONF_SRC="$REPO_ROOT/nginx/status-dashboard"
+  NGINX_CONF_DST="/etc/nginx/sites-available/status-dashboard"
   echo "Configuring nginx..."
-  [ -f "$NGINX_CONF_SRC" ] || die "nginx config $NGINX_CONF_SRC not found"
+  [[ -f "$NGINX_CONF_SRC" ]] || die "nginx config $NGINX_CONF_SRC not found"
   cp "$NGINX_CONF_SRC" "$NGINX_CONF_DST"
   ln -sf "$NGINX_CONF_DST" /etc/nginx/sites-enabled/status-dashboard
   rm -f /etc/nginx/sites-enabled/default
@@ -88,26 +103,14 @@ configure_nginx() {
   fi
 }
 
-print_success() {
+function print_success() {
   IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-  if [ -z "$IP" ]; then
+  if [[ -z "$IP" ]]; then
     IP=$(hostname -i 2>/dev/null | awk '{print $1}')
   fi
   echo "------------------------------------------------------------"
   echo "Status Dashboard is up and reachable at: http://$IP/"
   echo "------------------------------------------------------------"
-}
-
-main() {
-  require_root
-  check_commands
-  load_env
-  check_env_vars
-  build_image
-  stop_remove_container
-  run_container
-  configure_nginx
-  print_success
 }
 
 main "$@"
