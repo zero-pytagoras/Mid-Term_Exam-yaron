@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-RUN useradd -m dashboard
+RUN useradd -m dashboard # why no use this as app home ?
 
 WORKDIR /app
 
