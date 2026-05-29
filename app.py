@@ -2,7 +2,7 @@ import os
 from flask import Flask, jsonify, redirect, request, abort
 import socket
 
-PORT = int(os.environ.get("PORT", 5000))
+PORT = int(os.environ.get("PORT", 5000)) # what is the difference between os.environ.get() and os.environ['ENV_NAME']  ?
 VERSION = os.environ.get("VERSION", "1.0.0")
 API_KEY = os.environ.get("API_KEY")
 if not API_KEY:
