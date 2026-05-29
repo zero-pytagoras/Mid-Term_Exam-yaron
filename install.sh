@@ -1,7 +1,8 @@
 #!/bin/bash
+# missing headser explain
 set -eu
 
-function main() {
+function main() { #no control in main function
   require_root
   check_commands
   load_env
@@ -13,7 +14,7 @@ function main() {
   print_success
 }
 
-function die() {
+function die() { # bad naming
   echo "Error: $*" >&2
   exit 1
 }
