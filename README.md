@@ -4,11 +4,11 @@
 ##### This appears under EXAM.md file
 #  Table of Contents:
 * [Features](#Features)
-* Prerequisites
-* Installation
-* Development
-* Troubleshooting
-* License
+* [Prerequisites](#Prerequisites)
+* [Installation](#Installation)
+* [Development](#Development)
+* [Troubleshooting](#Troubleshooting)
+* [License](#Licence)
 
 
 =========================================
