@@ -3,7 +3,7 @@
 ### Brief discription of the project
 ##### This appears under EXAM.md file
 #  Table of Contents:
-* Features
+* [Features](#Features)
 * Prerequisites
 * Installation
 * Development
